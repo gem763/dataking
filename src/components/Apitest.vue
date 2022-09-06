@@ -4,9 +4,9 @@ import moment from 'moment'
 
 const { VITE_SEOUL_DATA_APIKEY } = import.meta.env
 
-defineProps({
-    msg: String
-})
+// defineProps({
+//     msg: String
+// })
 
 
 /*
