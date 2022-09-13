@@ -15,17 +15,11 @@ import { parsed, parse } from '@/assets/mathparser.js'
 // console.log(result);
 
 // let arr = [[12, 34, 2.2, 2], [30, 30, 2.1, 7]];
-// let df = new dfd.DataFrame(/*arr, {columns: ["A", "B", "C", "D"]}*/);
+// let df = new dfd.DataFrame(arr, {columns: ["A", "B", "C", "D"]});
 // let df = new dfd.Series([1,2,3,4]);
 // console.log(df.constructor.name);
 // console.log(1234)
 // console.log(moment('2022-09-09').add(1, 'days'));
-
-// console.log(new dfd.DataFrame());
-
-// let df = new dfd.DataFrame();
-// df.addColumn('test', [1,2,3], { inplace: true });
-// console.log(df);
 
 const { VITE_SEOUL_DATA_APIKEY } = import.meta.env
 
@@ -125,7 +119,7 @@ class DanfoBase {
     }
 
     init_obj(data) {
-        const obj_type = this.obj_type;
+        let obj_type = this.obj_type;
 
         if (data.constructor.name.includes(obj_type)) {
             return data
@@ -148,6 +142,7 @@ class DanfoBase {
     }
 
     r(right) {
+        // return (typeof right == 'number') ? right : right.obj
         return right.obj ? right.obj : right
     }
 
@@ -174,7 +169,21 @@ class Column extends DanfoBase {
         super(data);
     }
 
+    // init_obj(data) {
+    //     try {
+    //         if (data.constructor.name.toLowerCase().includes('series')) {
+    //             return data
+    //         } else {
+    //             return new dfd.Series(data)
+    //         }
+
+    //     } catch(e) {
+    //         throw new Error(`something wrong while creating column object from ${data}`);
+    //     }
+    // }
+
     sum() {
+        // console.log(this.obj.sum())
         return this.obj.sum()
     }
 }
@@ -183,48 +192,41 @@ class Table extends DanfoBase {
     constructor(data) {
         super(data);
         this.cols_added = [];
-        // this.view = {
-        //     obj: null,
-        //     cols: []
-        // }
+        this.view = null;
     }
 
-    _custom_col(name, formula_parsed) {
-        try {
-            const _col = eval(formula_parsed).obj;
-            _col.$columns = [ name ];
-            return _col
+    // init_obj(data) {
+    //     try {
+    //         if (data.constructor.name.toLowerCase().includes('dataframe')) {
+    //             return data
+    //         } else {
+    //             return new dfd.DataFrame(data)
+    //         }
 
-        } catch(e) {
-            throw new Error(`something wrong while getting column [${name}]: ${formula}`);
-        }
-    }
-
-    // view_custom_cols(cols) {
-    //     const view_obj = cols.map(col => {
-    //         const _formula = parsed(col.formula).replaceAll('$', 'this.');
-    //         this.view.cols.push({
-    //             name: col.name,
-    //             formula: col.formula,
-    //             formula_parsed: _formula
-    //         });
-
-    //         return this._custom_col(col.name, _formula)
-    //     });
-
-    //     this.view.obj = dfd.concat({ dfList: view_obj, axis: 1 });
+    //     } catch(e) {
+    //         throw new Error(`something wrong while creating table object from ${data}`);
+    //     }
     // }
 
-    add_custom_cols(cols) {
-        cols.forEach(col => {
-            const _formula = parsed(col.formula).replaceAll('$', 'this.');
+    add_custom_col(name, formula) {
+        try {
+            const _formula = parsed(formula).replaceAll('$', 'this.');
+            this.obj.addColumn(name, eval(_formula).obj, { inplace: true });
+
             this.cols_added.push({
-                name: col.name,
-                formula: col.formula,
+                name: name,
+                formula: formula,
                 formula_parsed: _formula
             });
 
-            this.obj.addColumn(col.name, this._custom_col(col.name, _formula), { inplace: true });
+        } catch(e) {
+            throw new Error(`something wrong while adding column [${name}]: ${formula}`);
+        }
+    }
+
+    add_custom_cols(cols) {
+        cols.forEach(col => {
+            this.add_custom_col(col.name, col.formula);
         })
     }
 
@@ -234,38 +236,8 @@ class Table extends DanfoBase {
 }
 
 
-class Multiloader {
-    constructor(specs) {
-        this.loaders = this._loaders(specs);
-    }
 
-    _loaders(specs) {
-        const l = {};
-        for (let apid in specs) {
-            l[apid] = Loader.build(apid, specs[apid]);
-        }
-
-        return l
-    }
-
-    load() {
-        Object.values(this.loaders).forEach(l => l.load());
-    }
-
-    // api(id) {
-    //     return this.loaders[id]
-    // }
-
-    // col(id_name) {
-    //     const id_and_name = id_name.split('.');
-    //     const id = id_and_name[0];
-    //     const name = id_and_name[1];
-    //     return this.api(id)... 요런 느낌?
-    // }
-}
-
-
-class Loader {
+class Dataloader {
     constructor(api, p) {
         this.api = api;
         this.p = p;
@@ -277,10 +249,10 @@ class Loader {
 
         if (api) {
             if (api.category == 'timeseries' && api.type == 'base') {
-                return new TimeseriesBaseloader(api, p)
+                return new DataloaderTimeseriesBase(api, p)
             
             } else if (api.category == 'timeseries' && api.type == 'derivative') {
-                return new TimeseriesLoader(api, p)
+                return new DataloaderTimeseries(api, p)
             }
 
         } else {
@@ -292,16 +264,16 @@ class Loader {
         throw new Error('run() method must be implemented');
     }
 
-    // get(cols) {
-    //     this.table.view_custom_cols(cols);
-    // }
+    get(cols) {
+        this.table.add_custom_cols(cols);
+    }
 }
 
 
-class TimeseriesLoader extends Loader {
+class DataloaderTimeseries extends Dataloader {
     constructor(api, p) {
         super(api, p);
-        this.loader = Loader.build(api.detail.baseid, p);
+        this.loader = Dataloader.build(api.detail.baseid, p);
     }
 
     async load() {
@@ -311,7 +283,7 @@ class TimeseriesLoader extends Loader {
 }
 
 
-class TimeseriesBaseloader extends Loader {
+class DataloaderTimeseriesBase extends Dataloader {
     constructor(api, p) {
         super(api, p);
         this.today = moment();
@@ -427,7 +399,6 @@ class TimeseriesBaseloader extends Loader {
 }
 
 export {
-    Loader,
-    Multiloader
+    Dataloader
     // Apibuilder
 }

@@ -9,11 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "danfojs": "^1.1.1",
+    "lex": "^1.7.9",
     "lodash": "^4.17.21",
     "moment": "^2.29.4",
+    "pinia": "^2.0.22",
     "vue": "^3.2.37"
   },
   "devDependencies": {
+    "@originjs/vite-plugin-commonjs": "^1.0.3",
     "@vitejs/plugin-vue": "^3.0.3",
     "vite": "^3.0.7"
   }
