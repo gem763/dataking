@@ -11,7 +11,11 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src')
+      '@': path.resolve(__dirname, './src'),
+
+      // https://github.com/nuxt/vite/issues/160
+      // npm i --save-dev rollup-plugin-node-builtins
+      fs: require.resolve('rollup-plugin-node-builtins'),
     }
   },
   define: {
